@@ -46,13 +46,13 @@ type ReportRequest struct {
 }
 
 type UsageData struct {
-	Version   string         `json:"version"`
-	Arch      string         `json:"arch"`
-	OS        string         `json:"os"`
-	ClusterID string         `json:"cluster_id"`
-	ServerID  string         `json:"server_id"`
-	Values    map[string]int `json:"values"`
-	Time      int64          `json:"time"`
+	Version   string `json:"version"`
+	Arch      string `json:"arch"`
+	OS        string `json:"os"`
+	ClusterID string `json:"cluster_id"`
+	ServerID  string `json:"server_id"`
+	Uptime    int64  `json:"uptime"`
+	Time      int64  `json:"time"`
 }
 
 func (u *UsageData) Hash() (string, error) {
@@ -147,40 +147,26 @@ func (r *Reporter) SingleReport() error {
 		OS:        runtime.GOOS,
 		ClusterID: r.clusterID,
 		ServerID:  r.serverID,
-		Values: map[string]int{
-			"num_databases":       3,
-			"num_measurements":    2342,
-			"num_series":          87232,
-			"uptime":              int(time.Since(r.start).Truncate(time.Second).Seconds()),
-			"blks_write":          39,
-			"blks_write_bytes":    2421,
-			"blks_write_bytes_c":  2202,
-			"points_write":        39,
-			"points_write_dedupe": 39,
-		},
-		Time: time.Now().Unix(),
+		Uptime:    int64(time.Since(r.start).Truncate(time.Second).Seconds()),
+		Time:      time.Now().Unix(),
 	}
 
 	base, err := ud.Hash()
 	if err != nil {
 		return err
 	}
-	fmt.Println("client base:", base, r.token)
+
 	pow, err := r.minter.Mint(r.token + base)
 	if err != nil {
 		return err
 	}
 
-	rep, err := r.client.SendReport(context.Background(), &ReportRequest{
+	_, err := r.client.SendReport(context.Background(), &ReportRequest{
 		Token: r.token,
 		Pow:   pow,
 		Data:  ud,
 	})
-	if err != nil {
-		return err
-	}
-	fmt.Println(rep)
-	return nil
+	return err
 }
 
 type client struct {
