@@ -161,7 +161,7 @@ func (r *Reporter) SingleReport() error {
 		return err
 	}
 
-	_, err := r.client.SendReport(context.Background(), &ReportRequest{
+	_, err = r.client.SendReport(context.Background(), &ReportRequest{
 		Token: r.token,
 		Pow:   pow,
 		Data:  ud,
