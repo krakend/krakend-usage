@@ -23,6 +23,8 @@ const (
 
 	sessionEndpoint = "/session"
 	reportEndpoint  = "/report"
+
+	timeout = 5 * time.Second
 )
 
 var (
@@ -109,7 +111,8 @@ func New(url, clusterID, serverID string) (*Reporter, error) {
 		sessionEndpoint: sessionEndpoint,
 		reportEndpoint:  reportEndpoint,
 	}
-	ses, err := usageClient.NewSession(context.Background(), &SessionRequest{
+	localCtx, _ := context.WithTimeout(context.Background(), timeout)
+	ses, err := usageClient.NewSession(localCtx, &SessionRequest{
 		ClusterID: clusterID,
 		ServerID:  serverID,
 	})
@@ -131,7 +134,8 @@ func New(url, clusterID, serverID string) (*Reporter, error) {
 
 func (r *Reporter) Report(ctx context.Context) {
 	for {
-		r.SingleReport()
+		localCtx, _ := context.WithTimeout(ctx, timeout)
+		r.SingleReport(localCtx)
 		select {
 		case <-ctx.Done():
 			return
@@ -140,7 +144,7 @@ func (r *Reporter) Report(ctx context.Context) {
 	}
 }
 
-func (r *Reporter) SingleReport() error {
+func (r *Reporter) SingleReport(ctx context.Context) error {
 	ud := UsageData{
 		Version:   core.KrakendVersion,
 		Arch:      runtime.GOARCH,
@@ -161,7 +165,7 @@ func (r *Reporter) SingleReport() error {
 		return err
 	}
 
-	_, err = r.client.SendReport(context.Background(), &ReportRequest{
+	_, err = r.client.SendReport(ctx, &ReportRequest{
 		Token: r.token,
 		Pow:   pow,
 		Data:  ud,
