@@ -23,7 +23,7 @@ const (
 	sessionEndpoint = "/session"
 	reportEndpoint  = "/report"
 
-	timeout = 5 * time.Second
+	timeout = 15 * time.Second
 )
 
 var (
