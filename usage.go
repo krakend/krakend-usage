@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/catalinc/hashcash"
-	"github.com/devopsfaith/krakend/core"
 )
 
 const (
@@ -96,9 +95,10 @@ type Reporter struct {
 	start     time.Time
 	minter    Minter
 	token     string
+	version   string
 }
 
-func New(url, clusterID, serverID string) (*Reporter, error) {
+func New(url, clusterID, serverID, Version string) (*Reporter, error) {
 	if url == "" {
 		url = defaultURL
 	}
@@ -127,6 +127,7 @@ func New(url, clusterID, serverID string) (*Reporter, error) {
 		token:     ses.Token,
 		clusterID: clusterID,
 		serverID:  serverID,
+		version:   Version,
 	}
 
 	return r, nil
@@ -146,7 +147,7 @@ func (r *Reporter) Report(ctx context.Context) {
 
 func (r *Reporter) SingleReport(ctx context.Context) error {
 	ud := UsageData{
-		Version:   core.KrakendVersion,
+		Version:   r.version,
 		Arch:      runtime.GOARCH,
 		OS:        runtime.GOOS,
 		ClusterID: r.clusterID,
