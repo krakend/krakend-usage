@@ -10,10 +10,11 @@ type Options struct {
 	ClusterID string
 	ServerID  string
 	URL       string
+	Version   string
 }
 
 func StartReporter(ctx context.Context, opt Options) error {
-	reporter, err := usage.New(opt.URL, opt.ClusterID, opt.ServerID)
+	reporter, err := usage.New(opt.URL, opt.ClusterID, opt.ServerID, opt.Version)
 	if err != nil {
 		return err
 	}
