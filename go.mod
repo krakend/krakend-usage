@@ -1,4 +1,4 @@
-module github.com/devopsfaith/krakend-usage
+module github.com/krakendio/krakend-usage
 
 go 1.16
 

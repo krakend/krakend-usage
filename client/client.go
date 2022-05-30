@@ -2,8 +2,6 @@ package client
 
 import (
 	"context"
-
-	"github.com/devopsfaith/krakend-usage"
 )
 
 type Options struct {
