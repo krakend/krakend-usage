@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/catalinc/hashcash"
-	"github.com/devopsfaith/krakend-usage"
+	"github.com/krakendio/krakend-usage"
 )
 
 type mockUsageServer struct {
