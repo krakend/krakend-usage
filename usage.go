@@ -2,34 +2,63 @@ package usage
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"runtime"
 	"time"
-
-	"github.com/catalinc/hashcash"
 )
 
 const (
 	defaultURL       = "https://usage.krakend.io"
-	HashBits         = 20
-	SaltChars        = 40
-	DefaultExtension = ""
+	defaultExtension = ""
+
+	hashBits  uint = 20
+	saltChars uint = 40
 
 	sessionEndpoint = "/session"
 	reportEndpoint  = "/report"
 
-	timeout = 15 * time.Second
-)
-
-var (
-	hasher      = hashcash.New(HashBits, SaltChars, DefaultExtension)
+	timeout     = 15 * time.Second
 	reportLapse = 12 * time.Hour
 )
+
+var ReportExpiration = 60 * time.Second
+
+type Options struct {
+	// ClusterID identifies the cluster
+	ClusterID string
+	// ServerID identifies the instance
+	ServerID string
+	// URL is the base path of the remote service
+	URL string
+	// Version of the application reporting
+	Version string
+	// Minter is the default Minter injected into the Reporter
+	Minter Minter
+	// ExtraPayload is the extra information to send with the first report
+	ExtraPayload []byte
+	// HashBits are the number of bits of collision
+	HashBits uint
+	// SaltChars are the number of bytes of salt chars
+	SaltChars uint
+	//SessionEndpoint is the path of the session endpoint
+	SessionEndpoint string
+	// ReportEndpoint is the path of the report endpoint
+	ReportEndpoint string
+	// Timeout is the max duration of every request
+	Timeout time.Duration
+	// ReportLapse is the waiting time between reports
+	ReportLapse time.Duration
+	// UserAgent is the value of the user-agent header to send with the requests
+	UserAgent string
+	// Client is the http client to use. If nil, a new http client will be created
+	Client *http.Client
+}
+
+type Minter interface {
+	Mint(string) (string, error)
+}
 
 type SessionRequest struct {
 	ClusterID string `json:"cluster_id"`
@@ -46,6 +75,11 @@ type ReportRequest struct {
 	Data  UsageData `json:"data"`
 }
 
+type ReportReply struct {
+	Status  int    `json:"status"`
+	Message string `json:"message,omitempty"`
+}
+
 type UsageData struct {
 	Version   string `json:"version"`
 	Arch      string `json:"arch"`
@@ -54,6 +88,7 @@ type UsageData struct {
 	ServerID  string `json:"server_id"`
 	Uptime    int64  `json:"uptime"`
 	Time      int64  `json:"time"`
+	Extra     []byte `json:"extra,omitempty"`
 }
 
 func (u *UsageData) Hash() (string, error) {
@@ -67,161 +102,5 @@ func (u *UsageData) Hash() (string, error) {
 }
 
 func (u *UsageData) Expired() bool {
-	return time.Since(time.Unix(u.Time, 0)) > time.Minute
-}
-
-type ReportReply struct {
-	Status  int    `json:"status"`
-	Message string `json:"message,omitempty"`
-}
-
-type Minter interface {
-	Mint(string) (string, error)
-}
-
-type UsageClient interface {
-	NewSession(context.Context, *SessionRequest) (*SessionReply, error)
-	SendReport(context.Context, *ReportRequest) (*ReportReply, error)
-}
-
-type HTTPClient interface {
-	Send(context.Context, string, interface{}, interface{}) error
-}
-
-type Reporter struct {
-	client    UsageClient
-	clusterID string
-	serverID  string
-	start     time.Time
-	minter    Minter
-	token     string
-	version   string
-}
-
-func New(url, clusterID, serverID, Version string) (*Reporter, error) {
-	if url == "" {
-		url = defaultURL
-	}
-
-	usageClient := &client{
-		HTTPClient: &httpClient{
-			c:   &http.Client{},
-			URL: url,
-		},
-		sessionEndpoint: sessionEndpoint,
-		reportEndpoint:  reportEndpoint,
-	}
-	localCtx, _ := context.WithTimeout(context.Background(), timeout)
-	ses, err := usageClient.NewSession(localCtx, &SessionRequest{
-		ClusterID: clusterID,
-		ServerID:  serverID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	r := &Reporter{
-		client:    usageClient,
-		start:     time.Now(),
-		minter:    hasher,
-		token:     ses.Token,
-		clusterID: clusterID,
-		serverID:  serverID,
-		version:   Version,
-	}
-
-	return r, nil
-}
-
-func (r *Reporter) Report(ctx context.Context) {
-	for {
-		localCtx, _ := context.WithTimeout(ctx, timeout)
-		r.SingleReport(localCtx)
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(reportLapse):
-		}
-	}
-}
-
-func (r *Reporter) SingleReport(ctx context.Context) error {
-	ud := UsageData{
-		Version:   r.version,
-		Arch:      runtime.GOARCH,
-		OS:        runtime.GOOS,
-		ClusterID: r.clusterID,
-		ServerID:  r.serverID,
-		Uptime:    int64(time.Since(r.start).Truncate(time.Second).Seconds()),
-		Time:      time.Now().Unix(),
-	}
-
-	base, err := ud.Hash()
-	if err != nil {
-		return err
-	}
-
-	pow, err := r.minter.Mint(r.token + base)
-	if err != nil {
-		return err
-	}
-
-	_, err = r.client.SendReport(ctx, &ReportRequest{
-		Token: r.token,
-		Pow:   pow,
-		Data:  ud,
-	})
-	return err
-}
-
-type client struct {
-	HTTPClient
-	sessionEndpoint string
-	reportEndpoint  string
-}
-
-func (c *client) NewSession(ctx context.Context, in *SessionRequest) (*SessionReply, error) {
-	reply := &SessionReply{}
-	if err := c.Send(ctx, c.sessionEndpoint, in, reply); err != nil {
-		return nil, err
-	}
-
-	return reply, nil
-}
-
-func (c *client) SendReport(ctx context.Context, in *ReportRequest) (*ReportReply, error) {
-	reply := &ReportReply{}
-	if err := c.Send(ctx, c.reportEndpoint, in, reply); err != nil {
-		return nil, err
-	}
-
-	return reply, nil
-}
-
-type httpClient struct {
-	c   *http.Client
-	URL string
-}
-
-func (c *httpClient) Send(ctx context.Context, path string, in, out interface{}) error {
-	buf := new(bytes.Buffer)
-	if err := json.NewEncoder(buf).Encode(in); err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("POST", c.URL+path, buf)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.c.Do(req.WithContext(ctx))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-	return json.NewDecoder(resp.Body).Decode(out)
+	return time.Since(time.Unix(u.Time, 0)) > ReportExpiration
 }

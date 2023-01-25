@@ -1,6 +1,6 @@
-module github.com/krakendio/krakend-usage
+module github.com/krakendio/krakend-usage/v2
 
-go 1.16
+go 1.19
 
 require (
 	github.com/catalinc/hashcash v0.0.0-20161205220751-e6bc29ff4de9
