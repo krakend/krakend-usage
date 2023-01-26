@@ -16,19 +16,6 @@ import (
 	"github.com/catalinc/hashcash"
 )
 
-type mockUsageServer struct {
-	newSession func(context.Context, *SessionRequest) (*SessionReply, error)
-	sendReport func(context.Context, *ReportRequest) (*ReportReply, error)
-}
-
-func (t *mockUsageServer) NewSession(c context.Context, s *SessionRequest) (*SessionReply, error) {
-	return t.newSession(c, s)
-}
-
-func (t *mockUsageServer) SendReport(c context.Context, r *ReportRequest) (*ReportReply, error) {
-	return t.sendReport(c, r)
-}
-
 func TestReport(t *testing.T) {
 	done := make(chan struct{}, 10)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
