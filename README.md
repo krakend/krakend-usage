@@ -10,7 +10,7 @@ The KrakenD usage is designed to collect **anonymous information** from any soft
 			ClusterID:       "clusterId",
 			ServerID:        "serverId",
 			URL:             "https://my.usage.api.tld",
-      			Version:         "v1.2.3",
+			Version:         "v1.2.3",
 			ExtraPayload:    someExtraPayload,
 			ReportLapse:     12 * time.Hour,
 			UserAgent:       "foo bar",
